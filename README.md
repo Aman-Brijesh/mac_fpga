@@ -123,9 +123,40 @@ This project demonstrates a custom FPGA-based neural compute unit implementing w
 
 ---
 
+## Update 1: ReLU Activation
+
+This update introduces a ReLU (Rectified Linear Unit) activation stage to the hardware accelerator.
+
+ReLU serves as the activation function in neural networks, introducing non-linearity by allowing positive values to pass through while clamping negative values to zero. This prevents stacked linear layers from collapsing into a single linear transformation and enables the network to model complex patterns.
+
+### Implementation
+
+A new signed output `relu_out` was added as the final accelerator output after activation.  
+ReLU is implemented using simple combinational logic:
+
+- If the accumulator (`acc`) is negative, `relu_out` is set to zero.
+- Otherwise, `relu_out` passes the accumulated value directly.
+
+This is achieved by checking the sign bit of the accumulator and conditionally assigning zero.
+
+### Additional Fixes
+
+While integrating ReLU, a reset-related issue was discovered: the accumulator and counter were not being cleared when `rst` was asserted. This caused incorrect results during consecutive inference runs.
+
+The datapath reset logic was updated so that both the FSM and datapath registers (`acc` and `count`) are properly cleared on reset, ensuring clean operation for every inference cycle.
+
+### Verification
+
+Both positive and negative test cases were simulated:
+
+- Positive accumulated values pass through ReLU unchanged.
+- Negative accumulated values are correctly clamped to zero.
+
+This confirms correct ReLU functionality and signed arithmetic behavior.
+
 ## Future Extensions
 
-- ReLU activation
+- ~ReLU activation~
 - Multiple neurons / layers
 - FPGA deployment
 - UART or GPIO interface
