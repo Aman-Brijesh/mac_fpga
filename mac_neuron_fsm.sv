@@ -1,14 +1,15 @@
 module mac_neuron_fsm(
     input logic clk,
     input logic start,
-    input logic [7:0]x,
-    input logic [7:0]w,
+    input logic signed [7:0]x,
+    input logic signed [7:0]w,
     input logic rst,
-    output logic [15:0]acc,
+    output logic signed [15:0]acc,
+    output logic signed [15:0]relu_out,
     output logic done_out
 );
 
-    logic signed[15:0] mult;
+    logic signed [15:0] mult;
     logic [2:0] count;
     logic clear;
     logic en;
@@ -17,6 +18,7 @@ module mac_neuron_fsm(
     assign mult = x*w;
     assign done = (count ==2);
     assign done_out = (state == DONE);
+    assign relu_out = (acc[15] == 1'b1)?16'sd0:acc;
 
     typedef enum logic[1:0]{ 
         IDLE,CLEAR,MAC,DONE
@@ -53,7 +55,7 @@ module mac_neuron_fsm(
     end
 
     always_ff @(posedge clk) begin
-        if(clear) begin
+        if(clear||rst) begin
             acc <= 0;
             count <=0;
         end
