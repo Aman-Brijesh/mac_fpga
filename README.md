@@ -154,9 +154,47 @@ Both positive and negative test cases were simulated:
 
 This confirms correct ReLU functionality and signed arithmetic behavior.
 
+![Verification](images/waveform.png)
+
+## Update 2: FPGA Deployment
+
+This update deployed the system verilog code in vivado, mapping it to an FPGA to evaluate Hardware Usage, Timing Performance, and Power Consumption. Implementing into vivado also enabled in getting a device schematic, as well as a device synthesis
+
+### Device Synthesis and Schematic
+
+![synthesis](images/Device.png)
+![schematic](images/Schematic.png)
+
+### Hardware Usage
+
+- Slice LUTs: 89
+- Slice Registers: 23
+- DSP Blocks: 0
+  ![Utilization](images/utilization.png)
+
+---
+
+### Timing Performance
+
+- Worst Negative Slack(WNS): +6.808ns
+- Estimate Critical Path Delay: ~3.19ns
+- Estimated Maximum Frequency(Fmax): ~313MHz
+  ![Timing](images/timing.png)
+
+---
+
+### Power Analysis
+
+Vivado Power Estimates
+
+- Total On-Chip Power: 0.072W
+  ![Power](images/power.png)
+
+---
+
 ## Future Extensions
 
 - ~ReLU activation~
+- ~FPGA deployment~
 - Multiple neurons / layers
-- FPGA deployment
 - UART or GPIO interface
