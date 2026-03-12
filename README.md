@@ -188,6 +188,8 @@ This update deployed the system verilog code in vivado, mapping it to an FPGA to
 Vivado Power Estimates
 
 - Total On-Chip Power: 0.072W
+
+  
   ![Power](images/power.png)
 
 ---
