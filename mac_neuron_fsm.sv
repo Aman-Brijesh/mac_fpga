@@ -9,6 +9,7 @@ module mac_neuron_fsm(
     output logic done_out
 );
 
+    
     logic signed [15:0] mult;
     logic [2:0] count;
     logic clear;
