@@ -2,42 +2,48 @@
 
 ## Overview
 
-This project implements a custom neural network hardware accelerator using Verilog.  
+This project implements a custom neural network hardware accelerator using SystemVerilog.  
 The accelerator performs weighted-sum (Multiply–Accumulate) operations under FSM control, enabling low-power, real-time inference suitable for Edge AI applications.
 
 The core operation implemented is:
-y = w1·x1 + w2·x2 + w3·x3
+y = w1·x1 + w2·x2 + ... + wn·xn
 
 This weighted sum forms the foundation of neural network inference.
 
-Instead of executing this computation in software, the design maps it directly to FPGA hardware for deterministic performance and energy efficiency.
+Instead of executing this computation in software, the design maps it directly to FPGA hardware for deterministic performance and energy efficiency. The weights are pre-trained, quantized to `int8`, and embedded directly into the hardware fabric.
 
 ---
+
+## Parameters
+
+- `NUM_INPUTS` – Configures the number of MAC operations per inference cycle (e.g., 2 for the hidden layer, 8 for the output layer).
 
 ## Inputs
 
 - `clk` – System clock
 - `rst` – Reset signal
 - `start` – Starts inference
-- `x` – Input data
-- `w` – Weight value
+- `x` – Input data (signed 8-bit)
+- `weight_idx` – 5-bit address to select the corresponding pre-trained weight from the embedded ROM
 
 ---
 
 ## Outputs
 
-- `acc` – Accumulator (weighted sum output)
+- `acc` – Accumulator (raw weighted sum output)
+- `relu_out` – Activated output (clamped to 0 if negative)
 - `done_out` – Indicates completion of inference
 
 ---
 
 ## Architecture
 
-The accelerator follows a **controller–datapath architecture**.
+The accelerator follows a **controller–datapath architecture** augmented with embedded memory.
 
-### Datapath
+### Datapath & Memory
 
-- Multiplier (`x × w`)
+- **Weight ROM**: A combinational lookup table containing the 24 quantized `int8` weights exported from the AI training pipeline.
+- Multiplier (`x × weight_val`)
 - Accumulator register (`acc`)
 - Counter (`count`)
 - Done comparator (`done`)
@@ -46,7 +52,7 @@ The accelerator follows a **controller–datapath architecture**.
 
 - Finite State Machine (FSM)
 
-The datapath performs computation, while the FSM controls execution flow.
+The datapath performs computation and memory retrieval, while the FSM controls execution flow.
 
 ---
 
@@ -58,17 +64,12 @@ The FSM consists of four states:
 
 Waits for the `start` signal.
 
----
-
 ### 2. CLEAR
 
 Initializes the datapath:
 acc = 0
 count = 0
-
 This prepares the accelerator for a new inference.
-
----
 
 ### 3. MAC
 
@@ -76,15 +77,13 @@ Main computation state.
 
 - Enable signal (`en`) is asserted.
 - Each clock cycle performs:
-  acc = acc + (x × w)
+  acc = acc + (x × weight_val)
   count = count + 1
 
-The FSM remains in MAC until the required number of inputs has been processed.
+The FSM remains in MAC until the parameterized number of inputs (`NUM_INPUTS`) has been processed.
 
 Completion is detected using:
-done = (count == N-1)
-
----
+done = (count == NUM_INPUTS - 1)
 
 ### 4. DONE
 
@@ -97,106 +96,61 @@ Final state.
 
 ---
 
-## Control Logic
-
-- The counter tracks how many MAC operations have occurred.
-- The `done` signal is generated from the counter.
-- The FSM uses `done` to exit MAC state.
-- FSM produces `clear` and `en` signals to control the datapath.
-
----
-
 ## Key Features
 
 - FSM-controlled MAC datapath
-- Fixed-point arithmetic
+- Fixed-point (`int8` / `int16`) signed arithmetic
+- **Embedded Weight ROM for standalone inference**
+- **Parameterized architecture for dynamic layer sizing**
+- Hardware ReLU activation
 - Deterministic latency
-- Low hardware complexity
-- Suitable for Edge AI deployment
-- Fully verified in Vivado simulation
+- Highly optimized for FPGA deployment
 
 ---
 
-## Summary
+## Update 1: ReLU Activation & Parameterization
 
-This project demonstrates a custom FPGA-based neural compute unit implementing weighted-sum inference using a controller–datapath architecture. By mapping neural operations directly to hardware, the design achieves predictable real-time performance with minimal power and resource usage, making it suitable for Edge AI applications.
+This update introduced a ReLU (Rectified Linear Unit) activation stage to the hardware accelerator alongside an embedded weight ROM.
 
----
+ReLU serves as the activation function in neural networks, introducing non-linearity by allowing positive values to pass through while clamping negative values to zero.
 
-## Update 1: ReLU Activation
+### Implementation Highlights
 
-This update introduces a ReLU (Rectified Linear Unit) activation stage to the hardware accelerator.
-
-ReLU serves as the activation function in neural networks, introducing non-linearity by allowing positive values to pass through while clamping negative values to zero. This prevents stacked linear layers from collapsing into a single linear transformation and enables the network to model complex patterns.
-
-### Implementation
-
-A new signed output `relu_out` was added as the final accelerator output after activation.  
-ReLU is implemented using simple combinational logic:
-
-- If the accumulator (`acc`) is negative, `relu_out` is set to zero.
-- Otherwise, `relu_out` passes the accumulated value directly.
-
-This is achieved by checking the sign bit of the accumulator and conditionally assigning zero.
-
-### Additional Fixes
-
-While integrating ReLU, a reset-related issue was discovered: the accumulator and counter were not being cleared when `rst` was asserted. This caused incorrect results during consecutive inference runs.
-
-The datapath reset logic was updated so that both the FSM and datapath registers (`acc` and `count`) are properly cleared on reset, ensuring clean operation for every inference cycle.
+- **Embedded ROM:** The 24 quantized weights from the Python model are stored in a `case` statement lookup table (bypassing elaboration limits and synthesizing efficiently into FPGA LUTs).
+- **Hardware ReLU:** Implemented using combinational logic to check the accumulator's sign bit. Negative values are clamped to `0`.
+- **Layer Parameterization:** A `NUM_INPUTS` parameter allows the FSM to dynamically size itself for either the Hidden Layer (2 MAC ops) or Output Layer (8 MAC ops).
 
 ### Verification
 
-Both positive and negative test cases were simulated:
+The updated testbench confirms that the correct weights are fetched using `weight_idx`, positive values pass through untouched, and negative accumulations are correctly clamped to zero.
 
-- Positive accumulated values pass through ReLU unchanged.
-- Negative accumulated values are correctly clamped to zero.
+![Waveform Verification](images/New_waveform.png)
 
-This confirms correct ReLU functionality and signed arithmetic behavior.
+---
 
-![Verification](images/waveform.png)
+## Update 2: FPGA Deployment & Synthesis
 
-## Update 2: FPGA Deployment
-
-This update deployed the system verilog code in vivado, mapping it to an FPGA to evaluate Hardware Usage, Timing Performance, and Power Consumption. Implementing into vivado also enabled in getting a device schematic, as well as a device synthesis
+The updated RTL was synthesized and implemented in Vivado to evaluate hardware utilization, routing, and power.
 
 ### Device Synthesis and Schematic
 
-![synthesis](images/Device.png)
-![schematic](images/Schematic.png)
+The generated schematic successfully demonstrates the synthesis of the `RTL_ROM` block feeding directly into the hardware multiplier alongside the FSM controller logic.
 
-### Hardware Usage
+![Device Implementation](images/Design.png)
+![RTL Schematic](images/schematic.png)
 
-- Slice LUTs: 89
-- Slice Registers: 23
-- DSP Blocks: 0
-  ![Utilization](images/utilization.png)
+### Hardware Usage Estimates
 
----
-
-### Timing Performance
-
-- Worst Negative Slack(WNS): +6.808ns
-- Estimate Critical Path Delay: ~3.19ns
-- Estimated Maximum Frequency(Fmax): ~313MHz
-  ![Timing](images/timing.png)
-
----
-
-### Power Analysis
-
-Vivado Power Estimates
-
-- Total On-Chip Power: 0.072W
-
-  
-  ![Power](images/power.png)
+- Highly optimized Slice LUT and Register utilization based on the integrated combinational ROM.
+- Minimal on-chip power footprint.
+- Stable timing parameters with positive Worst Negative Slack (WNS).
 
 ---
 
 ## Future Extensions
 
-- ~ReLU activation~
-- ~FPGA deployment~
-- Multiple neurons / layers
-- UART or GPIO interface
+- ~~ReLU activation~~
+- ~~FPGA deployment~~
+- ~~Embedded Quantized Weights~~
+- Multiple neurons / layers integration (Top-level Wrapper)
+- UART or GPIO interface for live data streaming
