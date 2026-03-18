@@ -1,10 +1,10 @@
 module mac_neuron_fsm #(
-    parameter NUM_INPUTS = 2 // Set to 2 for hidden layer, 8 for output layer
+    parameter NUM_INPUTS = 2 
 )(
     input logic clk,
     input logic start,
     input logic signed [7:0] x,
-    input logic [4:0] weight_idx, // 5-bit index to select from the 24 weights
+    input logic [4:0] weight_idx, 
     input logic rst,
     output logic signed [15:0] acc,
     output logic signed [15:0] relu_out,
@@ -13,8 +13,7 @@ module mac_neuron_fsm #(
 
     logic signed [7:0] weight_val;
 
-    // Combinational ROM implementation using a case statement
-    // This avoids array initialization errors in Icarus Verilog
+
     always_comb begin
         case (weight_idx)
             5'd0:  weight_val =  8'sd0;
@@ -41,7 +40,7 @@ module mac_neuron_fsm #(
             5'd21: weight_val =  8'sd127;
             5'd22: weight_val =  8'sd58;
             5'd23: weight_val =  8'sd89;
-            default: weight_val = 8'sd0; // Fallback
+            default: weight_val = 8'sd0;
         endcase
     end
 
@@ -51,14 +50,11 @@ module mac_neuron_fsm #(
     logic en;
     logic done;
 
-    // Multiply input x by the weight fetched from the ROM
     assign mult = x * weight_val;
     
-    // FSM done condition
     assign done = (count == (NUM_INPUTS - 1));
     assign done_out = (state == DONE);
     
-    // ReLU Activation: clamp negative values to 0
     assign relu_out = (acc[15] == 1'b1) ? 16'sd0 : acc;
 
     typedef enum logic[1:0]{ 
