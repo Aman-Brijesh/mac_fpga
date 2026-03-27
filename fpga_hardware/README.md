@@ -137,13 +137,18 @@ The updated RTL was synthesized and implemented in Vivado to evaluate hardware u
 The generated schematic successfully demonstrates the synthesis of the `RTL_ROM` block feeding directly into the hardware multiplier alongside the FSM controller logic.
 
 ![Device Implementation](images/Design.png)
-![RTL Schematic](images/schematic.png)
+![RTL Schematic](images/Schematic.png)
+![Package](images/package.png)
 
 ### Hardware Usage Estimates
 
 - Highly optimized Slice LUT and Register utilization based on the integrated combinational ROM.
+  ![Utilization](images/utilization.png)
 - Minimal on-chip power footprint.
+  
+  ![Power](images/power.png)
 - Stable timing parameters with positive Worst Negative Slack (WNS).
+  ![timing](images/timing.png)
 
 ---
 
